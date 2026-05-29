@@ -1,0 +1,99 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Microsoft.EntityFrameworkCore;
+using WinFormsApp3.Models;
+
+namespace WinFormsApp3
+{
+    public partial class UserControl1 : UserControl
+    {
+        private Book currentBook;
+        private Ispr2522KonkinMaLibraryDbContext context;
+        private string userRole;
+
+        public event EventHandler BookDeleted;
+        public UserControl1()
+        {
+            InitializeComponent();
+            btnEdit.Click += BtnEdit_Click;
+            btnDelete.Click += BtnDelete_Click;
+        }
+        public void LoadBook(Book book, string role)
+        {
+            currentBook = book;
+            userRole = role;
+            context = new Ispr2522KonkinMaLibraryDbContext();
+
+            // Перезагружаем книгу с авторами
+            currentBook = context.Books
+                .Include(b => b.Authors)
+                .FirstOrDefault(b => b.BookId == book.BookId) ?? book;
+
+            lblName.Text = currentBook.Title;
+            lblPrice.Text = $"{currentBook.Quantity:0.00} ₽";
+
+            // Отображаем авторов
+            if (currentBook.Authors.Count > 0)
+            {
+                var authorNames = string.Join(", ", currentBook.Authors.Select(a => $"{a.LastName} {a.FirstName}"));
+                lblAvtor.Text = authorNames;
+            }
+            else
+            {
+                lblAvtor.Text = "Неизвестен";
+            }
+
+            // Ограничиваем кнопки по ролям
+            if (userRole != "Админ")
+            {
+                btnDelete.Enabled = false;
+                btnEdit.Enabled = false;
+            }
+        }
+
+        private void BtnEdit_Click(object sender, EventArgs e)
+        {
+            var form = new EditBookForm();
+            form.SetContext(context, currentBook);
+            if (form.ShowDialog() == DialogResult.OK)
+            {
+                // Перезагружаем актуальные данные
+                currentBook = context.Books
+                    .Include(b => b.Authors)
+                    .FirstOrDefault(b => b.BookId == currentBook.BookId) ?? currentBook;
+
+                lblName.Text = currentBook.Title;
+                lblPrice.Text = $"{currentBook.Quantity:0.00} ₽";
+
+                if (currentBook.Authors.Count > 0)
+                {
+                    var authorNames = string.Join(", ", currentBook.Authors.Select(a => $"{a.LastName} {a.FirstName}"));
+                    lblAvtor.Text = authorNames;
+                }
+                else
+                {
+                    lblAvtor.Text = "Неизвестен";
+                }
+            }
+        }
+
+        private void BtnDelete_Click(object sender, EventArgs e)
+        {
+            if (MessageBox.Show($"Удалить книгу \"{currentBook.Title}\"?", "Подтверждение",
+                MessageBoxButtons.YesNo) == DialogResult.Yes)
+            {
+                context.Books.Remove(currentBook);
+                context.SaveChanges();
+                BookDeleted?.Invoke(this, EventArgs.Empty);
+            }
+        }
+    }
+}
+

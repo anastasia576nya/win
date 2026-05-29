@@ -1,0 +1,99 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using WinFormsApp3.Models;
+
+namespace WinFormsApp3
+{
+    public partial class EditBookForm : Form
+    {
+        private Ispr2522KonkinMaLibraryDbContext context;
+        private Book currentBook;
+        private bool isNew;
+        public EditBookForm()
+        {
+            InitializeComponent();
+            btnSave.Click += BtnSave_Click;
+            btnCancel.Click += BtnCancel_Click;
+        }
+        public void SetContext(Ispr2522KonkinMaLibraryDbContext ctx, Book editBook)
+        {
+            context = ctx;
+            isNew = editBook == null;
+            currentBook = isNew ? new Book() { Authors = new List<Author>() } : editBook;
+
+            // Загружаем авторов в комбобокс
+            var authors = context.Authors.ToList();
+            comboBoxAuthor.DataSource = new BindingSource(authors, null);
+            comboBoxAuthor.DisplayMember = "FullName";
+            comboBoxAuthor.ValueMember = "AuthorId";
+
+            if (!isNew)
+            {
+                textBoxName.Text = currentBook.Title;
+                textBoxPrice.Text = currentBook.Quantity.ToString();
+
+                // Выбираем первого автора книги если есть
+                if (currentBook.Authors.Count > 0)
+                {
+                    comboBoxAuthor.SelectedValue = currentBook.Authors.First().AuthorId;
+                }
+
+                Text = "Редактировать книгу";
+            }
+            else
+            {
+                Text = "Добавить книгу";
+            }
+        }
+
+        private void BtnSave_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(textBoxName.Text))
+            {
+                MessageBox.Show("Введите название!");
+                return;
+            }
+            if (!decimal.TryParse(textBoxPrice.Text, out decimal price))
+            {
+                MessageBox.Show("Введите цену!");
+                return;
+            }
+            if (comboBoxAuthor.SelectedValue == null)
+            {
+                MessageBox.Show("Выберите автора!");
+                return;
+            }
+
+            currentBook.Title = textBoxName.Text;
+            currentBook.Quantity = (int)price;
+
+            // Очищаем старых авторов и добавляем выбранного
+            currentBook.Authors.Clear();
+            var selectedAuthorId = (int)comboBoxAuthor.SelectedValue;
+            var selectedAuthor = context.Authors.FirstOrDefault(a => a.AuthorId == selectedAuthorId);
+            if (selectedAuthor != null)
+            {
+                currentBook.Authors.Add(selectedAuthor);
+            }
+
+            if (isNew) context.Books.Add(currentBook);
+            context.SaveChanges();
+            DialogResult = DialogResult.OK;
+            Close();
+        }
+
+        private void BtnCancel_Click(object sender, EventArgs e)
+        {
+            DialogResult = DialogResult.Cancel;
+            Close();
+        }
+    }
+}
+
